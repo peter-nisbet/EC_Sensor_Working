@@ -48,11 +48,14 @@
  * Definitions
  ******************************************************************************/
 //#define DEMO_UART UART1
-#define DEMO_UART UART0		//Changed from UART1 to UART0
+#define DEMO_UART UART0		//Changed from UART1 to UART0	//EC
+#define PH_UART UART2		//Changed from UART1 to UART0	//pH
 #define DEMO_UART_CLKSRC SYS_CLK
 #define DEMO_UART_CLK_FREQ CLOCK_GetFreq(SYS_CLK)
+#define PH_UART_CLK_FREQ CLOCK_GetFreq(BUS_CLK)
 //#define DEMO_UART_RX_TX_IRQn UART1_RX_TX_IRQn
-#define DEMO_UART_RX_TX_IRQn UART0_RX_TX_IRQn	//Changed from UART1 IRQ to UART0 IRQ
+#define DEMO_UART_RX_TX_IRQn UART0_RX_TX_IRQn	//Changed from UART1 IRQ to UART0 IRQ	//EC
+#define PH_UART_RX_TX_IRQn UART2_RX_TX_IRQn	//Changed from UART1 IRQ to UART2 IRQ	//pH
 /* Task priorities. */
 #define uart_task_PRIORITY (configMAX_PRIORITIES - 1)
 /*******************************************************************************
@@ -63,9 +66,11 @@ static void uart_task(void *pvParameters);
 /*******************************************************************************
  * Variables
  ******************************************************************************/
-const char *to_send = "FreeRTOS UART driver example!\r\n";
-const char *send_ring_overrun = "\r\nRing buffer overrun!\r\n";
-const char *send_hardware_overrun = "\r\nHardware buffer overrun!\r\n";
+//const char *to_send = "FreeRTOS UART driver example!\r\n";
+/*const char *send_ring_overrun = "\r\nRing buffer overrun!\r\n";
+const char *send_hardware_overrun = "\r\nHardware buffer overrun!\r\n";*/
+
+//******EC UART******//
 uint8_t background_buffer[40];
 uint8_t recv_buffer[1];
 
@@ -81,8 +86,26 @@ uart_rtos_config_t uart_config = {
     .buffer_size = sizeof(background_buffer),
 };
 
+//******PH UART******//
+uint8_t background_pHbuffer[40];
+uint8_t recv_pHbuffer[1];
+
+uart_rtos_handle_t pHhandle;
+struct _uart_handle t_pHhandle;
+
+uart_rtos_config_t pHuart_config = {
+    //.baudrate = 115200,
+	.baudrate = 9600,
+    .parity = kUART_ParityDisabled,
+    .stopbits = kUART_OneStopBit,
+    .buffer = background_pHbuffer,
+    .buffer_size = sizeof(background_pHbuffer),
+};
+
+
 //Added by Peter//
 char inputstring[30];
+char inputstringpH[30];
 bool endofDataFlag = 0;
 char* EC;
 char* TDS;
@@ -104,9 +127,10 @@ int main(void)
     BOARD_InitPins();
     BOARD_BootClockRUN();
     BOARD_InitDebugConsole();
-    NVIC_SetPriority(DEMO_UART_RX_TX_IRQn, 5);
+    NVIC_SetPriority(DEMO_UART_RX_TX_IRQn, 8);
+    NVIC_SetPriority(PH_UART_RX_TX_IRQn, 8);
 
-    xTaskCreate(uart_task, "Uart_task", configMINIMAL_STACK_SIZE + 30, NULL, uart_task_PRIORITY, NULL);
+    xTaskCreate(uart_task, "Uart_task", /*configMINIMAL_STACK_SIZE + 30*/ 1000, NULL, uart_task_PRIORITY, NULL);
 
     vTaskStartScheduler();
     for (;;)
@@ -199,6 +223,7 @@ static void uart_task(void *pvParameters)
 {
 	int error;
 	size_t n;
+	bool SensorToggle = 0;
 
 	uart_config.srcclk = DEMO_UART_CLK_FREQ;
 	uart_config.base = DEMO_UART;
@@ -208,39 +233,83 @@ static void uart_task(void *pvParameters)
         vTaskSuspend(NULL);
     }
 
+	pHuart_config.srcclk = PH_UART_CLK_FREQ;
+	pHuart_config.base = PH_UART;
+
+    if (0 > UART_RTOS_Init(&pHhandle, &t_pHhandle, &pHuart_config))
+    {
+        vTaskSuspend(NULL);
+    }
+
     do
     {
-    	//vTaskDelay(1);
-    	error = UART_RTOS_Receive(&handle, recv_buffer, sizeof(recv_buffer), &n);
-    	//strcpy(inputstring[i], recv_buffer);
-    	inputstring[i]=recv_buffer[0];
-    	i++;
-    	if(i>29)
-    	{
-    		i=0;
-    	}
-    	if(strncmp(recv_buffer, "\r", 1) == 0)
-    	{
-    		endofDataFlag = 1;
-    		i=0;
-    	}
-    	if(endofDataFlag == 1)
-    	{
-    		endofDataFlag=0;
-    		if((inputstring[0]>=48)&&(inputstring[0]<=57))
-    		{
-    			pars_data();
-    		}
-        	else
-        	{
-        		PRINTF("Data Received Not EC value! \n");
-        	}
-    	}
-    	memset(recv_buffer, 0, sizeof(recv_buffer));
+    	if (SensorToggle == 1){
 
-    } while (kStatus_Success == error);
+    		error = UART_RTOS_Receive(&pHhandle, recv_pHbuffer, sizeof(recv_pHbuffer), &n);
+
+    		inputstringpH[i]=recv_pHbuffer[0];
+    		i++;
+    		if(i>29)
+    		{
+    			i=0;
+    		}
+    		if(strncmp(recv_pHbuffer, "\r", 1) == 0)
+    		{
+    			endofDataFlag = 1;
+    			i=0;
+    		}
+    		if(endofDataFlag == 1)
+    		{
+    			endofDataFlag=0;
+    			if((inputstringpH[0]>=48)&&(inputstringpH[0]<=57))
+    			{
+    				PRINTF("pH: %s\n", inputstringpH);
+    				//pars_data();
+    				SensorToggle = 0;
+    			}
+    			else
+    			{
+    				PRINTF("Data Received Not pH value! \n");
+    			}
+    		}
+    		memset(recv_pHbuffer, 0, sizeof(recv_pHbuffer));
+    	}
+
+    	else if (SensorToggle == 0){
+
+    		error = UART_RTOS_Receive(&handle, recv_buffer, sizeof(recv_buffer), &n);
+
+    		inputstring[i]=recv_buffer[0];
+    		i++;
+    		if(i>29)
+    		{
+    			i=0;
+    		}
+    		if(strncmp(recv_buffer, "\r", 1) == 0)
+    		{
+    			endofDataFlag = 1;
+    			i=0;
+    		}
+    		if(endofDataFlag == 1)
+    		{
+    			endofDataFlag=0;
+    			if((inputstring[0]>=48)&&(inputstring[0]<=57))
+    			{
+    				pars_data();
+    				SensorToggle = 1;
+    			}
+    			else
+    			{
+    				PRINTF("Data Received Not EC value! \n");
+    			}
+    		}
+    		memset(recv_buffer, 0, sizeof(recv_buffer));
+    	}
+
+   	} while (kStatus_Success == error);
 
     UART_RTOS_Deinit(&handle);
+    UART_RTOS_Deinit(&pHhandle);
 
     vTaskSuspend(NULL);
 }

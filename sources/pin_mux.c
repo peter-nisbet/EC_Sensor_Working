@@ -46,6 +46,8 @@ PinsProfile:
 #define PIN0_IDX                         0u   /*!< Pin number for pin 0 in a port */
 #define PIN1_IDX                         1u   /*!< Pin number for pin 1 in a port */
 #define PIN2_IDX                         2u   /*!< Pin number for pin 2 in a port */
+#define PIN3_IDX                         3u   /*!< Pin number for pin 3 in a port */
+
 #define SOPT5_UART1TXSRC_UART_TX      0x00u   /*!< UART 1 transmit data source select: UART1_TX pin */
 
 /*
@@ -66,12 +68,15 @@ BOARD_InitPins:
  *END**************************************************************************/
 void BOARD_InitPins(void) {
   CLOCK_EnableClock(kCLOCK_PortE);                           /* Port E Clock Gate Control: Clock enabled */
-  CLOCK_EnableClock(kCLOCK_PortA);                           /* Port E Clock Gate Control: Clock enabled */
+  CLOCK_EnableClock(kCLOCK_PortA);                           /* Port A Clock Gate Control: Clock enabled */
+  CLOCK_EnableClock(kCLOCK_PortD);                           /* Port D Clock Gate Control: Clock enabled */
 
   PORT_SetPinMux(PORTE, PIN0_IDX, kPORT_MuxAlt3);            /* PORTE0 (pin 1) is configured as UART1_TX */
   PORT_SetPinMux(PORTE, PIN1_IDX, kPORT_MuxAlt3);            /* PORTE1 (pin 2) is configured as UART1_RX */
   PORT_SetPinMux(PORTA, PIN1_IDX, kPORT_MuxAlt2);            /* PORTA1 (pin 23) is configured as UART0_RX */
   PORT_SetPinMux(PORTA, PIN2_IDX, kPORT_MuxAlt2);            /* PORTA2 (pin 24) is configured as UART0_TX */
+  PORT_SetPinMux(PORTD, PIN3_IDX, kPORT_MuxAlt3);			 /* PORTD3 (pin 60) is configured as UART2_TX */
+  PORT_SetPinMux(PORTD, PIN2_IDX, kPORT_MuxAlt3);			 /* PORTD2 (pin 59) is configured as UART2_RX */
   SIM->SOPT5 = ((SIM->SOPT5 &
     (~(SIM_SOPT5_UART1TXSRC_MASK)))                          /* Mask bits to zero which are setting */
       | SIM_SOPT5_UART1TXSRC(SOPT5_UART1TXSRC_UART_TX)       /* UART 1 transmit data source select: UART1_TX pin */
